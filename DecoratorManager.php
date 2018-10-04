@@ -10,8 +10,11 @@ use src\Integration\DataProvider;
 
 class DecoratorManager extends DataProvider
 {
-    public $cache;
-    public $logger;
+    /** @var LoggerInterface */
+    private $logger;
+
+    /** @var CacheItemPoolInterface */
+    protected $cache;
 
     /**
      * @param string $host
@@ -19,12 +22,25 @@ class DecoratorManager extends DataProvider
      * @param string $password
      * @param CacheItemPoolInterface $cache
      */
-    public function __construct($host, $user, $password, CacheItemPoolInterface $cache)
-    {
+    public function __construct(
+        string $host, string $user, string $password, CacheItemPoolInterface $cache
+    ) {
         parent::__construct($host, $user, $password);
+
         $this->cache = $cache;
     }
 
+    /**
+     * @return LoggerInterface
+     */
+    public function getLogger()
+    {
+        return $this->logger;
+    }
+
+    /**
+     * @param LoggerInterface $logger
+     */
     public function setLogger(LoggerInterface $logger)
     {
         $this->logger = $logger;
@@ -33,32 +49,37 @@ class DecoratorManager extends DataProvider
     /**
      * {@inheritdoc}
      */
-    public function getResponse(array $input)
+    public function getResponse(array $input): array
     {
         try {
-            $cacheKey = $this->getCacheKey($input);
+            $cacheKey  = $this->getCacheKey($input);
             $cacheItem = $this->cache->getItem($cacheKey);
+
             if ($cacheItem->isHit()) {
                 return $cacheItem->get();
             }
 
-            $result = parent::get($input);
+            $result = parent::getResponse($input);
 
             $cacheItem
                 ->set($result)
-                ->expiresAt(
-                    (new DateTime())->modify('+1 day')
-                );
+                ->expiresAt((new DateTime())->modify('+1 day'))
+            ;
 
             return $result;
         } catch (Exception $e) {
-            $this->logger->critical('Error');
-        }
+            ($logger = $this->getLogger()) and $logger->critical('Error');
 
-        return [];
+            return [];
+        }
     }
 
-    public function getCacheKey(array $input)
+    /**
+     * @param array $input
+     *
+     * @return string
+     */
+    public function getCacheKey(array $input): string
     {
         return json_encode($input);
     }
