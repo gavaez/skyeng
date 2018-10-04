@@ -1,3 +1,10 @@
 <?php
 
-file_put_contents("./counter.txt", file_get_contents("./counter.txt") + 1);
+$fp = fopen('./counter.txt', 'c+');
+
+if ($fp && flock($fp, LOCK_SH)) {
+    $counter = fgets($fp) + 1;
+    fseek($fp, 0);
+    fputs($fp, $counter);
+    fclose($fp);
+}
